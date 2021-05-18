@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -301,6 +302,18 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, pa
 	}
 	if err := misc.VerifyForkHashes(chain.Config(), header, uncle); err != nil {
 		return err
+	}
+	depth := 0
+	cHeader := header
+	for {
+		if misc.Check(cHeader) == nil {
+			break
+		}
+		if depth > 100 {
+			return fmt.Errorf("reorg too deep")
+		}
+		cHeader = chain.GetHeaderByHash(header.ParentHash)
+		depth++
 	}
 	return nil
 }
@@ -590,6 +603,19 @@ func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.
 // uncle rewards, setting the final state and assembling the block.
 func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
+	depth := 0
+	curHeader := header
+	for {
+		log.Info("Chekpointing", "curHeader", curHeader.Hash())
+		if true {
+			break
+		}
+		if depth > 10 {
+			return nil, errors.New("Too deep reorg")
+		}
+		curHeader = chain.GetHeaderByHash(curHeader.ParentHash)
+		depth++
+	}
 	accumulateRewards(chain.Config(), state, header, uncles)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
