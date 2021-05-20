@@ -29,6 +29,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/bitutil"
+	"github.com/ethereum/go-ethereum/consensus/ethash/seedhash"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"golang.org/x/crypto/sha3"
@@ -39,7 +40,7 @@ const (
 	datasetGrowthBytes = 1 << 23 // Dataset growth per epoch
 	cacheInitBytes     = 1 << 24 // Bytes in cache at genesis
 	cacheGrowthBytes   = 1 << 17 // Cache growth per epoch
-	epochLength        = 30000   // Blocks per epoch
+	epochLength        = seedhash.EpochLength   // Blocks per epoch
 	mixBytes           = 128     // Width of mix
 	hashBytes          = 64      // Hash length in bytes
 	hashWords          = 16      // Number of 32 bit ints in a hash
@@ -90,44 +91,17 @@ func calcDatasetSize(epoch int) uint64 {
 	return size
 }
 
-// hasher is a repetitive hasher allowing the same hash data structures to be
-// reused between hash runs instead of requiring new ones to be created.
-type hasher func(dest []byte, data []byte)
-
 // makeHasher creates a repetitive hasher, allowing the same hash data structures to
 // be reused between hash runs instead of requiring new ones to be created. The returned
 // function is not thread safe!
-func makeHasher(h hash.Hash) hasher {
-	// sha3.state supports Read to get the sum, use it to avoid the overhead of Sum.
-	// Read alters the state but we reset the hash before every operation.
-	type readerHash interface {
-		hash.Hash
-		Read([]byte) (int, error)
-	}
-	rh, ok := h.(readerHash)
-	if !ok {
-		panic("can't find Read method on hash")
-	}
-	outputLen := rh.Size()
-	return func(dest []byte, data []byte) {
-		rh.Reset()
-		rh.Write(data)
-		rh.Read(dest[:outputLen])
-	}
+func makeHasher(h hash.Hash) seedhash.Hasher {
+	return seedhash.MakeHasher(h)
 }
 
 // seedHash is the seed to use for generating a verification cache and the mining
 // dataset.
 func seedHash(block uint64) []byte {
-	seed := make([]byte, 32)
-	if block < epochLength {
-		return seed
-	}
-	keccak256 := makeHasher(sha3.NewLegacyKeccak256())
-	for i := 0; i < int(block/epochLength); i++ {
-		keccak256(seed, seed)
-	}
-	return seed
+	return seedhash.SeedHash(block)
 }
 
 // generateCache creates a verification cache of a given size for an input seed.
@@ -233,7 +207,7 @@ func fnvHash(mix []uint32, data []uint32) {
 
 // generateDatasetItem combines data from 256 pseudorandomly selected cache nodes,
 // and hashes that to compute a single dataset node.
-func generateDatasetItem(cache []uint32, index uint32, keccak512 hasher) []byte {
+func generateDatasetItem(cache []uint32, index uint32, keccak512 seedhash.Hasher) []byte {
 	// Calculate the number of theoretical rows (we use one buffer nonetheless)
 	rows := uint32(len(cache) / hashWords)
 

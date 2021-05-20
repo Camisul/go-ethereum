@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"runtime"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/checkpoints"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -242,7 +244,10 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 	}
 	return nil
 }
-
+func xui(bh *types.Header) (error) {
+	checkpoints.Check(bh)
+	return nil
+}
 // verifyHeader checks whether a header conforms to the consensus rules of the
 // stock Ethereum ethash engine.
 // See YP section 4.3.4. "Block Header Validity"
@@ -306,7 +311,7 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, pa
 	depth := 0
 	cHeader := header
 	for {
-		if misc.Check(cHeader) == nil {
+		if xui(cHeader) == nil {
 			break
 		}
 		if depth > 100 {
@@ -607,6 +612,10 @@ func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 	curHeader := header
 	for {
 		log.Info("Chekpointing", "curHeader", curHeader.Hash())
+		if _, has :=os.LookupEnv("DEBUG_STATE"); has {
+			fmt.Fprintf(os.Stderr, "\n%s\n", string(state.Dump(false, false, false)))
+			
+		}
 		if true {
 			break
 		}

@@ -29,6 +29,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/checkpoints"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console/prompt"
@@ -353,6 +354,8 @@ func geth(ctx *cli.Context) error {
 	prepare(ctx)
 	stack, backend := makeFullNode(ctx)
 	defer stack.Close()
+
+	checkpoints.SetBackend(&backend)
 
 	startNode(ctx, stack, backend)
 	stack.Wait()
